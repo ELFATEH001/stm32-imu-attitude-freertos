@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
+project(mpu6500)
 
 # Setup compiler settings
 set(CMAKE_C_STANDARD 11)
@@ -33,9 +34,10 @@ add_executable(${CMAKE_PROJECT_NAME})
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
-add_subdirectory(firmware/app)
-add_subdirectory(firmware/drivers)
-add_subdirectory(firmware/hal)
+add_subdirectory(firmware)
+# add_subdirectory(firmware/app)
+# add_subdirectory(firmware/drivers)
+# add_subdirectory(firmware/hal)
 
 # # Link directories setup
 # target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -61,7 +63,16 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 
 # Add linked libraries
-target_link_libraries(${CMAKE_PROJECT_NAME}
-    stm32cubemx
-    # Add user defined libraries
+# target_link_libraries(${CMAKE_PROJECT_NAME}
+#     stm32cubemx
+#     hal
+#     drivers
+#     app
+#     # Add user defined libraries
+# )
+target_link_libraries(mpu6500 PRIVATE
+    # stm32cubemx
+    app
+    drivers
+    hal
 )
