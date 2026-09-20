@@ -6,6 +6,8 @@ extern "C" {
 #endif
 
 void appMain(void);
+void runSensorTask();
+void runTelemetryTask();
 
 #ifdef __cplusplus
 }

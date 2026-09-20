@@ -23,9 +23,13 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "app.hpp"
+#include "ImuMsg.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+typedef StaticTask_t osStaticThreadDef_t;
+typedef StaticQueue_t osStaticMessageQDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -45,13 +49,40 @@ I2C_HandleTypeDef hi2c1;
 
 UART_HandleTypeDef huart1;
 
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-    .name = "defaultTask",
-    .stack_size = 128 * 4,
+/* Definitions for SensorTask */
+osThreadId_t SensorTaskHandle;
+uint32_t SensorTaskBuffer[128];
+osStaticThreadDef_t SensorTaskControlBlock;
+const osThreadAttr_t SensorTask_attributes = {
+    .name = "SensorTask",
+    .cb_mem = &SensorTaskControlBlock,
+    .cb_size = sizeof(SensorTaskControlBlock),
+    .stack_mem = &SensorTaskBuffer[0],
+    .stack_size = sizeof(SensorTaskBuffer),
+    .priority = (osPriority_t)osPriorityHigh,
+};
+/* Definitions for TelemetryTask */
+osThreadId_t TelemetryTaskHandle;
+uint32_t TelemetryTaskBuffer[128];
+osStaticThreadDef_t TelemetryTaskControlBlock;
+const osThreadAttr_t TelemetryTask_attributes = {
+    .name = "TelemetryTask",
+    .cb_mem = &TelemetryTaskControlBlock,
+    .cb_size = sizeof(TelemetryTaskControlBlock),
+    .stack_mem = &TelemetryTaskBuffer[0],
+    .stack_size = sizeof(TelemetryTaskBuffer),
     .priority = (osPriority_t)osPriorityNormal,
 };
+/* Definitions for imuQueue */
+osMessageQueueId_t imuQueueHandle;
+uint8_t imuQueueBuffer[16 * sizeof(ImuMsg)];
+osStaticMessageQDef_t imuQueueControlBlock;
+const osMessageQueueAttr_t imuQueue_attributes = {
+    .name = "imuQueue",
+    .cb_mem = &imuQueueControlBlock,
+    .cb_size = sizeof(imuQueueControlBlock),
+    .mq_mem = &imuQueueBuffer,
+    .mq_size = sizeof(imuQueueBuffer)};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -61,7 +92,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
-void StartDefaultTask(void *argument);
+void StartSensorTask(void *argument);
+void StartTelemetryTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -104,7 +136,7 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  appMain();
+  // appMain(); // during the mpu alone test
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -122,13 +154,20 @@ int main(void)
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* creation of imuQueue */
+  imuQueueHandle = osMessageQueueNew(16, sizeof(ImuMsg), &imuQueue_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  /* creation of SensorTask */
+  SensorTaskHandle = osThreadNew(StartSensorTask, NULL, &SensorTask_attributes);
+
+  /* creation of TelemetryTask */
+  TelemetryTaskHandle = osThreadNew(StartTelemetryTask, NULL, &TelemetryTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -210,7 +249,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.ClockSpeed = 400000;
   hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -283,22 +322,34 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartDefaultTask */
+/* USER CODE BEGIN Header_StartSensorTask */
 /**
- * @brief  Function implementing the defaultTask thread.
+ * @brief  Function implementing the SensorTask thread.
  * @param  argument: Not used
  * @retval None
  */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
+/* USER CODE END Header_StartSensorTask */
+void StartSensorTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
-  for (;;)
-  {
-    osDelay(1);
-  }
+  runSensorTask();
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartTelemetryTask */
+/**
+ * @brief Function implementing the TelemetryTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_StartTelemetryTask */
+void StartTelemetryTask(void *argument)
+{
+  /* USER CODE BEGIN StartTelemetryTask */
+  /* Infinite loop */
+  runTelemetryTask();
+  /* USER CODE END StartTelemetryTask */
 }
 
 /**
