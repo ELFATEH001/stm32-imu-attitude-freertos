@@ -11,7 +11,9 @@ public:
                     uint16_t len);
   bool writeRegister(uint8_t devAddr, uint8_t regAddr, const uint8_t *data,
                      uint16_t len);
+  bool writeRegister(uint8_t devAddr, uint8_t regAddr, uint8_t value);
   bool isDeviceReady(uint8_t devAddr, uint32_t trails = 3);
+  void halDelay(uint32_t delayTime);
 
 private:
   I2C_HandleTypeDef &handle_;
