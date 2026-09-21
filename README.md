@@ -13,7 +13,9 @@ Real-time attitude estimation running on an STM32 microcontroller under FreeRTOS
 
 The C++ application code lives in the `firmware/` folder, organized as follows:
 
+```
 firmware/
 ├── app → application logic (attitude estimation, tasks)
 ├── driver → MPU6500 sensor driver
 └── hal → C++ wrapper over the STM32 HAL
+```
