@@ -1,5 +1,6 @@
 // firmware/app/app.cpp
 #include "app.hpp"
+#include "ComplementaryFilter.hpp"
 #include "FreeRTOS.h"
 #include "I2CBus.hpp"
 #include "ImuFrame.hpp"
@@ -8,33 +9,34 @@
 #include "main.h"
 #include "mpu6500.hpp"
 
-void appMain() {
-  I2CBus bus(hi2c1);
-  Mpu6500 mpu(bus);
+// void appMain() {
+//   I2CBus bus(hi2c1);
+//   Mpu6500 mpu(bus);
 
-  // uint8_t whoAmI = 0;
-  // bool ok = mpu.whoAmI(whoAmI);
-  bool init =
-      mpu.init(Mpu6500GyroscopeRange::Dps250, Mpu6500AccelerometerRange::G2);
+//   // uint8_t whoAmI = 0;
+//   // bool ok = mpu.whoAmI(whoAmI);
+//   bool init =
+//       mpu.init(Mpu6500GyroscopeRange::Dps250, Mpu6500AccelerometerRange::G2);
 
-  // (void)ok;
-  if (!init) {
-    while (true) {
-      /* breakpoint: init failed — check wiring/address */
-    };
-  }
-  mpu.calibrateGyroBias();
-  while (true) {
-    ImuSample data = mpu.read();
-    // breakpoint here: inspect data.accelG / data.gyroDps
-  }
-}
+//   // (void)ok;
+//   if (!init) {
+//     while (true) {
+//       /* breakpoint: init failed — check wiring/address */
+//     };
+//   }
+//   mpu.calibrateGyroBias();
+//   while (true) {
+//     ImuSample data = mpu.read();
+//     // breakpoint here: inspect data.accelG / data.gyroDps
+//   }
+// }
 
 extern osMessageQueueId_t imuQueueHandle;
 
 void runSensorTask() {
   I2CBus bus(hi2c1);
   Mpu6500 mpu(bus);
+  ComplementaryFilter filter(0.98f, 0.001f);
 
   if (!mpu.init()) {
     for (;;) {
@@ -54,6 +56,7 @@ void runSensorTask() {
 
   for (;;) {
     ImuSample sample = mpu.read();
+    filter.update(sample.accelG, sample.gyroDps);
 
     if (++sampleCount >= TELEMETRY_DECIMATION) {
       sampleCount = 0;
@@ -64,6 +67,8 @@ void runSensorTask() {
       msg.gyroDps[0] = sample.gyroDps[0];
       msg.gyroDps[1] = sample.gyroDps[1];
       msg.gyroDps[2] = sample.gyroDps[2];
+      msg.roll = filter.roll();
+      msg.pitch = filter.pitch();
 
       if (osMessageQueuePut(imuQueueHandle, &msg, 0, 0) != osOK) {
         droppedCount++;

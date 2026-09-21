@@ -1,5 +1,6 @@
 add_library(app STATIC 
     app.cpp
+    ComplementaryFilter.cpp
 )
 
 target_include_directories(app PUBLIC

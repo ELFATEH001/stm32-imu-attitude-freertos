@@ -9,6 +9,8 @@ extern "C" {
 typedef struct {
   float accelG[3];
   float gyroDps[3];
+  float roll;
+  float pitch;
 } ImuMsg;
 
 #define IMU_FRAME_SYNC1 0xAAu
