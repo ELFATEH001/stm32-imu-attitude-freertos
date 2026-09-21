@@ -2,9 +2,9 @@
 #include "app.hpp"
 #include "FreeRTOS.h"
 #include "I2CBus.hpp"
+#include "ImuFrame.hpp"
 #include "ImuMsg.h"
 #include "cmsis_os.h"
-#include "event_groups.h"
 #include "main.h"
 #include "mpu6500.hpp"
 
@@ -48,18 +48,28 @@ void runSensorTask() {
   TickType_t lastWake = xTaskGetTickCount();
   const TickType_t period = pdMS_TO_TICKS(1);
 
+  constexpr uint32_t TELEMETRY_DECIMATION = 20;
+  uint32_t sampleCount = 0;
+  uint32_t droppedCount = 0;
+
   for (;;) {
     ImuSample sample = mpu.read();
 
-    ImuMsg msg;
-    msg.accelG[0] = sample.accelG[0];
-    msg.accelG[1] = sample.accelG[1];
-    msg.accelG[2] = sample.accelG[2];
-    msg.gyroDps[0] = sample.gyroDps[0];
-    msg.gyroDps[1] = sample.gyroDps[1];
-    msg.gyroDps[2] = sample.gyroDps[2];
+    if (++sampleCount >= TELEMETRY_DECIMATION) {
+      sampleCount = 0;
+      ImuMsg msg;
+      msg.accelG[0] = sample.accelG[0];
+      msg.accelG[1] = sample.accelG[1];
+      msg.accelG[2] = sample.accelG[2];
+      msg.gyroDps[0] = sample.gyroDps[0];
+      msg.gyroDps[1] = sample.gyroDps[1];
+      msg.gyroDps[2] = sample.gyroDps[2];
 
-    osMessageQueuePut(imuQueueHandle, &msg, 0, 0);
+      if (osMessageQueuePut(imuQueueHandle, &msg, 0, 0) != osOK) {
+        droppedCount++;
+      };
+    }
+
     vTaskDelayUntil(&lastWake, period);
   }
 }
@@ -69,7 +79,9 @@ void runTelemetryTask() {
   for (;;) {
     if (osMessageQueueGet(imuQueueHandle, &msg, nullptr, osWaitForever) ==
         osOK) {
-      // format + transmit
+      ImuFrame frame = buildFrame(msg);
+      HAL_UART_Transmit(&huart1, reinterpret_cast<uint8_t *>(&frame),
+                        sizeof(ImuFrame), 50);
     }
   }
 }
